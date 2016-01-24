@@ -1,0 +1,87 @@
+#Loading and preprocessing the data
+###first read csv file and remove NA 
+csv <-read.csv("activity.csv", as.is=T)
+real_values <-csv[complete.cases(csv), ] 
+#What is mean total number of steps taken per day?
+###calculate total steps taken per day
+total_steps <- aggregate(steps ~ date, real_values, sum)
+#Make a histogram of the total number of steps taken each day
+hist(total_steps$steps, main="histogram of total number of steps per day", xlab="steps per day")
+dev.copy(png,file="hist1.png")     
+dev.off()
+# calculate mean and median value of total num of steps taken per day
+summary(total_steps)
+### so the mean is 10766 and median is 10765
+
+#What is the average daily activity pattern?
+###first find the mean number of steps taken per interval
+steps_interval <-aggregate(steps ~ interval, real_values, mean)
+# Make a time series plot (i.e. 𝚝𝚢𝚙𝚎 = "𝚕") of the 5-minute interval (x-axis) and the average number of steps ta
+#ken, averaged across all days (y-axis)
+plot(steps_interval$interval, steps_interval$steps, type="l", main="time series plot of the average number of steps taken", ylab="average steps", xlab="interval")
+dev.copy(png,file="time_series.png")     
+dev.off()
+
+#Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+###first look for the row num of the max step
+max_steps <- which.max(steps_interval$steps)
+###subset the row 
+steps_interval[max_steps,]
+### the 835 interval contains maxium average steps, which is 206
+
+
+#Imputing missing values
+###Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with 𝙽𝙰s)
+miss_values_rows<- csv[!complete.cases(csv),]
+nrow(miss_values_rows)
+### number of rows with missing value is 2304
+
+#Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+###Create a new dataset that is equal to the original dataset but with the missing data filled in.
+#### i wnat to replace the na with the average step in that interval
+data_imputed <- csv
+for(i in 1:nrow(data_imputed)) {
+        if( is.na(data_imputed$steps[i])) {
+                interval_value <- data_imputed$interval[i]
+                steps_value <- steps_interval[
+                        steps_interval$interval==interval_value,]
+                data_imputed$steps[i] <- steps_value$steps
+        }
+}
+
+###now calculate the new total steps with the data set in which the na values are replaced
+steps_imputed_day<- aggregate(steps ~ date, data_imputed, sum)
+hist(steps_imputed_day$steps,main="histogram of total steps daily with NA value replaced", xlab="total steps per day")
+dev.copy(png,file="hist_2.png")     
+dev.off()
+### calculate mean and median
+mean(steps_imputed_day$steps)
+median(steps_imputed_day$steps)
+### the mean and medians calculated from the imputed data are 10766.19 and 10766.19. so not very differnt from the values in the first part of assignment.
+
+#Are there differences in activity patterns between weekdays and weekends?
+###Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+###first try to determine if a day is a week day or weekend day
+week_day <- function(date_val) {
+        wd <- weekdays(as.Date(date_val, '%Y-%m-%d'))
+        if (!(wd =="Saturday" || wd =="Sunday")) {
+                x <- 'Weekday'
+        } else {
+                x <- 'Weekend'
+        }
+        x
+}
+
+###use the week_day function to add a new column to the original data
+csv$day_type <- as.factor(sapply(csv$date, week_day))
+library(ggplot2)
+### create a set of data containing averge steps taken per interval, averaged on week days or weekend days
+steps_daytype <- aggregate(steps ~ interval+day_type, csv, mean)
+### create the plot with annotations
+ggplot(steps_daytype, aes(interval, steps)) +
+        geom_line(stat = "identity", aes(colour = day_type))+
+        theme_gray() +
+        facet_grid(day_type~., scales="fixed", space="fixed") +
+        ggtitle("average steps per interval by day type")
+dev.copy(png,file="week_days.png")     
+dev.off()
